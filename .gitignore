@@ -1,0 +1,30 @@
+# Secrets — never committed, no exceptions
+.env
+.env.*
+*.pem
+*.key
+credentials*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# Node / TypeScript
+node_modules/
+coverage/
+*.tsbuildinfo
+
+# Claude Code local state
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Scratch
+*.local.*

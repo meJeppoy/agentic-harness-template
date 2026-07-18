@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/credentials*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf /:*)",
+      "Bash(curl * | sh:*)",
+      "Bash(curl * | bash:*)"
+    ]
+  },
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "120000"
+  }
+}
