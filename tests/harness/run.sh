@@ -148,6 +148,12 @@ for p in python typescript none; do
   fi
   rm -rf "$d"
 done
+d=$(fresh_copy) || exit 1
+check "AI review is off unless opted in" bash -c "HARNESS_PRESET=none HARNESS_AI_REVIEW=n '$d/scripts/init.sh' >/dev/null && test ! -e '$d/.github/workflows/claude-review.yml'"
+check "init with HARNESS_AI_REVIEW=y installs AI review" bash -c "HARNESS_PRESET=none HARNESS_AI_REVIEW=y '$d/scripts/init.sh' >/dev/null && test -f '$d/.github/workflows/claude-review.yml'"
+check "AI review only runs on owner-authored PRs" grep -q 'user.login == github.repository_owner' "$ROOT/presets/common/claude-review.yml"
+check "AI review is read-only on contents" grep -q 'contents: read' "$ROOT/presets/common/claude-review.yml"
+rm -rf "$d"
 
 echo
 echo "$pass passed, $fail failed"
