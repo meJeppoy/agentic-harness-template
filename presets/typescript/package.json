@@ -7,8 +7,7 @@
     "test": "vitest run",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",

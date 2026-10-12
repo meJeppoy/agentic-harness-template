@@ -28,3 +28,8 @@ coverage/
 
 # Scratch
 *.local.*
+
+# Harness hook state (local only)
+.claude/.last-green
+.claude/.stop-attempts
+.claude/red-step

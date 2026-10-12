@@ -1,1 +1,1 @@
-ADRs from /grill-with-docs and domain-modeling live here. One decision per file: NNN-slug.md with Context / Decision / Consequences.
+ADRs from `/grill` live here. One decision per file: `NNNN-slug.md` (next number up). One paragraph is enough: context, decision, why. Only for decisions that are hard to reverse, surprising without context, and the result of a real trade-off — smaller ones go in `docs/DECISIONS.md`.
