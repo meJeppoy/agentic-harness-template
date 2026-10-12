@@ -77,13 +77,19 @@ esac
   warn "pre-push floor is off: nothing stops a direct push to main from this clone" "git config core.hooksPath scripts/git-hooks"
 
 if online && has gh; then
-  if ! gh auth status >/dev/null 2>&1; then
-    warn "GitHub CLI isn't signed in, so branch protection wasn't checked" "gh auth login"
+  if ! login=$(gh api user --jq .login 2>&1); then
+    # Inside Claude Code's macOS sandbox, gh (a Go program) can't verify TLS certificates and then
+    # wrongly reports the login as invalid. Don't send the user to re-authenticate for that.
+    if grep -qiE 'x509|certificate' <<<"$login"; then
+      warn "gh can't reach GitHub from inside Claude Code's sandbox (a known macOS limit), so branch protection wasn't checked — your login is fine" "run scripts/doctor.sh in your own terminal, or ask Claude to re-run it outside the sandbox"
+    else
+      warn "GitHub CLI isn't signed in, so branch protection wasn't checked" "gh auth login"
+    fi
   elif repo=$(gh repo view --json nameWithOwner,visibility,owner,defaultBranchRef --jq '"\(.nameWithOwner) \(.visibility) \(.owner.login) \(.defaultBranchRef.name)"' 2>/dev/null); then
     read -r name vis owner branch <<<"$repo"
     # The rules GitHub actually enforces on the default branch (active rulesets only). Protection = PRs required.
     rules=$(gh api "repos/$name/rules/branches/$branch" --jq '[.[].type] | join(" ")' 2>/dev/null)
-    plan=$([ "$owner" = "$(gh api user --jq .login 2>/dev/null)" ] && gh api user --jq '.plan.name // ""' 2>/dev/null)
+    plan=$([ "$owner" = "$login" ] && gh api user --jq '.plan.name // ""' 2>/dev/null)
     if [[ " $rules " == *" pull_request "* ]]; then
       pass "$branch on GitHub requires pull requests ($name)"
       [[ " $rules " == *" required_status_checks "* ]] || warn "$branch doesn't require CI to pass before merging" "import .github/rulesets/protect-main.json (docs/REPO-SECURITY.md §2)"
