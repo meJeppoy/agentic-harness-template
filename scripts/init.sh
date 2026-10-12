@@ -7,8 +7,11 @@ cd "$(dirname "$0")/.."
 echo "== Agentic Harness init =="
 
 # 1. Template-only files (the harness's own tests) don't belong in your project.
-rm -rf tests/harness .github/workflows/harness-ci.yml
-rmdir tests 2>/dev/null || true
+#    Only on the first run (harness-ci.yml still present), so a later tests/harness/ of yours is never touched.
+if [ -f .github/workflows/harness-ci.yml ]; then
+  rm -rf tests/harness .github/workflows/harness-ci.yml
+  rmdir tests 2>/dev/null || true
+fi
 
 copy() { [ -e "$2" ] || cp "$1" "$2"; }
 want_install() { [ -z "${HARNESS_SKIP_INSTALL:-}" ]; }

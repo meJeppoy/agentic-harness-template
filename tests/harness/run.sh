@@ -78,9 +78,11 @@ echo fail >"$fake/result"; echo change >"$d/app.py"
 check "failing checks → blocked (exit 2)" exits 2 stop false
 check "block message names the failure" bash -c "$(declare -f stop); d='$d' stop false 2>&1 | grep -q 'test failed in app.py'"
 check "gives up after 3 automatic retries" bash -c "$(declare -f stop); d='$d'; stop true 2>/dev/null; stop true 2>/dev/null; stop true >/dev/null 2>&1; [ \$? -eq 0 ]"
-touch "$d/.claude/red-step"; echo change2 >>"$d/app.py"
+echo pass >"$fake/result"; touch "$d/.claude/red-step"; echo change2 >>"$d/app.py"
 check "red step → only fast checks run" bash -c "$(declare -f stop); d='$d' stop false >/dev/null 2>&1; [ \"\$(tail -n1 '$fake/calls')\" = fast ]"
-rm "$d/.claude/red-step"; echo change3 >>"$d/app.py"
+rm "$d/.claude/red-step"
+check "closing a red step forces a full run, even with no other change" bash -c "$(declare -f stop); d='$d' stop false >/dev/null 2>&1; [ \"\$(tail -n1 '$fake/calls')\" = full ]"
+echo change3 >>"$d/app.py"
 check "HARNESS_SKIP_STOP_CHECK=1 → skipped" bash -c "n=\$(wc -l <'$fake/calls'); $(declare -f stop); d='$d' HARNESS_SKIP_STOP_CHECK=1 stop false >/dev/null; [ \$(wc -l <'$fake/calls') -eq \$n ]"
 check "outside a git repo → allowed" exits 0 bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && echo '{}' | CLAUDE_PROJECT_DIR=\$PWD bash '$d/.claude/hooks/stop-check.sh'"
 rm -rf "$d" "$fake"
@@ -111,6 +113,9 @@ check "passes when pre-push floor is on" bash -c "$(declare -f doc); d='$d' doc 
 check "warns about unfilled CLAUDE.md placeholders" bash -c "$(declare -f doc); d='$d' doc | grep -q '^WARN.*placeholder'"
 touch "$d/.claude/red-step"
 check "warns about an open TDD red step" bash -c "$(declare -f doc); d='$d' doc | grep -q '^WARN.*red step'"
+cp "$ROOT/presets/typescript/package.json" "$d/package.json"
+check "fails when the typescript preset has no packageManager (CI can't pick a pnpm version)" bash -c "$(declare -f doc); d='$d' doc | grep -q '^FAIL.*packageManager'"
+rm "$d/package.json"
 mv "$d/.claude/skills/tdd" "$d/tdd.bak"
 check "fails when an owned skill is missing" exits 1 bash -c "$(declare -f doc); d='$d' doc >/dev/null"
 check "explains the fix for a missing skill" bash -c "$(declare -f doc); d='$d' doc | grep -A1 '^FAIL.*tdd' | grep -q '→'"
@@ -140,7 +145,9 @@ for p in python typescript none; do
   d=$(fresh_copy) || exit 1
   check "init ($p) runs non-interactively" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
   check "init ($p) removes template-only files" test ! -e "$d/tests/harness" -a ! -e "$d/.github/workflows/harness-ci.yml"
+  mkdir -p "$d/tests/harness" && echo mine >"$d/tests/harness/user-file.txt"
   check "init ($p) is safe to re-run" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
+  check "init ($p) re-run keeps the user's own tests/harness" test -f "$d/tests/harness/user-file.txt"
   case $p in
     python) check "init (python) copies preset" test -f "$d/pyproject.toml" -a -f "$d/.github/workflows/ci.yml" -a -f "$d/tests/test_smoke.py" ;;
     typescript) check "init (typescript) copies preset" test -f "$d/package.json" -a -f "$d/tsconfig.json" -a -f "$d/biome.json" -a -f "$d/src/smoke.test.ts" -a -f "$d/.github/workflows/ci.yml" ;;
@@ -159,7 +166,7 @@ done
 d=$(fresh_copy) || exit 1
 check "AI review is off unless opted in" bash -c "HARNESS_PRESET=none HARNESS_AI_REVIEW=n '$d/scripts/init.sh' >/dev/null && test ! -e '$d/.github/workflows/claude-review.yml'"
 check "init with HARNESS_AI_REVIEW=y installs AI review" bash -c "HARNESS_PRESET=none HARNESS_AI_REVIEW=y '$d/scripts/init.sh' >/dev/null && test -f '$d/.github/workflows/claude-review.yml'"
-check "AI review only runs on owner-authored PRs" grep -q 'user.login == github.repository_owner' "$ROOT/presets/common/claude-review.yml"
+check "AI review only runs on PRs from people with write access" grep -q 'fromJSON(.\["OWNER","MEMBER","COLLABORATOR"\]' "$ROOT/presets/common/claude-review.yml"
 check "AI review is read-only on contents" grep -q 'contents: read' "$ROOT/presets/common/claude-review.yml"
 rm -rf "$d"
 

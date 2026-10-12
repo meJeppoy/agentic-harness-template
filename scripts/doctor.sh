@@ -27,6 +27,8 @@ if [ -f pyproject.toml ]; then
 elif [ -f package.json ]; then
   has node && pass "node $(node --version)" || fail "typescript preset needs Node.js" "install the LTS version from https://nodejs.org"
   has pnpm && pass "pnpm $(pnpm --version 2>/dev/null)" || fail "typescript preset needs pnpm" "install it: https://pnpm.io/installation"
+  grep -q '"packageManager"' package.json && pass "package.json pins the pnpm version (packageManager)" ||
+    fail "package.json has no \"packageManager\" field, so CI can't tell which pnpm to install and will fail" 'run: pnpm pkg set packageManager=pnpm@$(pnpm --version)'
   [ -f pnpm-lock.yaml ] && pass "pnpm-lock.yaml present" || warn "no pnpm-lock.yaml — CI installs with --frozen-lockfile and will fail" "run: pnpm install, then commit pnpm-lock.yaml"
 else
   warn "No stack preset yet (no pyproject.toml or package.json), so there is nothing to test" "fine before your first grill; the kickoff prompt sets up the toolchain"
@@ -77,14 +79,17 @@ esac
 if online && has gh; then
   if ! gh auth status >/dev/null 2>&1; then
     warn "GitHub CLI isn't signed in, so branch protection wasn't checked" "gh auth login"
-  elif repo=$(gh repo view --json nameWithOwner,visibility,owner --jq '"\(.nameWithOwner) \(.visibility) \(.owner.login)"' 2>/dev/null); then
-    read -r name vis owner <<<"$repo"
-    rules=$(gh api "repos/$name/rulesets" --jq length 2>/dev/null || echo 0)
+  elif repo=$(gh repo view --json nameWithOwner,visibility,owner,defaultBranchRef --jq '"\(.nameWithOwner) \(.visibility) \(.owner.login) \(.defaultBranchRef.name)"' 2>/dev/null); then
+    read -r name vis owner branch <<<"$repo"
+    # The rules GitHub actually enforces on the default branch (active rulesets only). Protection = PRs required.
+    rules=$(gh api "repos/$name/rules/branches/$branch" --jq '[.[].type] | join(" ")' 2>/dev/null)
     plan=$([ "$owner" = "$(gh api user --jq .login 2>/dev/null)" ] && gh api user --jq '.plan.name // ""' 2>/dev/null)
-    if [ "${rules:-0}" -gt 0 ]; then pass "main is protected on GitHub ($rules rulesets on $name)"
+    if [[ " $rules " == *" pull_request "* ]]; then
+      pass "$branch on GitHub requires pull requests ($name)"
+      [[ " $rules " == *" required_status_checks "* ]] || warn "$branch doesn't require CI to pass before merging" "import .github/rulesets/protect-main.json (docs/REPO-SECURITY.md §2)"
     elif [ "$vis" = PRIVATE ] && [ "$plan" = free ]; then
       warn "$name is private on GitHub Free, which can't protect branches — the pre-push hook is your only merge gate" "make the repo public, or upgrade to GitHub Pro, then follow docs/REPO-SECURITY.md"
-    else warn "$name has no rulesets: anyone with access can push straight to main" "follow docs/REPO-SECURITY.md §2 (two gh api commands)"; fi
+    else warn "$branch on $name has no active ruleset requiring pull requests: anyone with access can push straight to it" "follow docs/REPO-SECURITY.md §2 (two gh api commands)"; fi
   else
     warn "no GitHub repository found for this folder" "create one and push: gh repo create --source . --private --push"
   fi

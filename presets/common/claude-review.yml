@@ -8,8 +8,9 @@ on:
     types: [opened, synchronize, ready_for_review]
 jobs:
   review:
-    # Owner-authored PRs only: never run an agent holding your token on a stranger's PR.
-    if: github.event.pull_request.user.login == github.repository_owner && !github.event.pull_request.draft
+    # Only PRs from people with write access (you, org members, collaborators): never run an agent
+    # holding your token on a stranger's PR. Works for personal and organization repos.
+    if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

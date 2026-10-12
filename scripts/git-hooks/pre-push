@@ -2,6 +2,8 @@
 # Local merge floor — works on every GitHub plan (rulesets need a public repo or a paid plan).
 # Enable once per clone: git config core.hooksPath scripts/git-hooks   (/doctor tells you if it's off)
 # Emergency bypass: git push --no-verify — and say why in docs/DECISIONS.md.
+# Limit: checks run on your working tree, not the exact commits being pushed — commit your fixes
+# before pushing. CI (and rulesets, where your plan has them) check the real commits.
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 

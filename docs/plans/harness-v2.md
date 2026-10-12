@@ -95,4 +95,11 @@ Built on `feat/harness-v2`, one commit per slice, one PR (instead of a branch pe
 - **Sandbox needs toolchain allowances.** uv and pnpm caches added to `filesystem.allowWrite`; `pnpm install`/`add`/`remove` and `gh` added to `excludedCommands` (pnpm's store lock and Go TLS verification both fail under macOS Seatbelt). In the Claude desktop app session used to build this, `excludedCommands` did not take effect for `gh` — verify in a plain CLI session (open question).
 - **No `features.json`, no `/handoff`.** Session-end writes a handoff doc instead (humanlayer pattern).
 - **Secret scanning** is unavailable on personal private repos even on Pro (GitHub docs source) — REPO-SECURITY §0 states it.
+- **Stop hook loop safety** uses a 3-retry cap per user turn instead of exiting on `stop_hook_active` (which would allow only one retry). Claude Code's own 8-continuation cap is the backstop. The last-green record stores the mode (`full`/`fast`) so closing a red step always forces a full run (verifier finding).
+- **Per-preset `sandbox-domains.json` not built**: PyPI and npm registries are in the base allowlist instead — no JSON merging in init.
+- **Ruleset edits** are blocked by an `Edit(/.github/rulesets/**)` permission deny rule (native) rather than the guard hook.
+- **init.sh does not enable the pre-push hook.** Enabling it before the beginner's first setup push would block that push to main. GUIDE §3.2 enables it right after the push; `/doctor` warns until it's on.
+- **AI review trigger** uses `author_association` in OWNER/MEMBER/COLLABORATOR (works for org repos) with `pull-requests: read` + `id-token: write` (the action posts through its GitHub App), per the action's own examples.
+- **Pre-push checks the working tree**, not the pushed commits — documented in the hook; CI checks the real commits.
+- **Doctor's protection check** reads the rules GitHub actually enforces on the default branch (`/rules/branches/<branch>`) and requires a `pull_request` rule, so disabled or unrelated rulesets don't count.
 - **T-12** (rulesets + security settings on the template repo) waits for explicit owner approval.

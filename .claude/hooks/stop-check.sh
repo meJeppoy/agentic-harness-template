@@ -18,11 +18,13 @@ grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*true' <<<"$input" || rm -f "
 # Fingerprint of the working tree (tracked + untracked, respecting .gitignore), via a throwaway index.
 idx=$(mktemp "${TMPDIR:-/tmp}/harness-index.XXXXXX"); cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null
 fp=$(GIT_INDEX_FILE=$idx git add -A 2>/dev/null && GIT_INDEX_FILE=$idx git write-tree); rm -f "$idx"
-[ -n "$fp" ] && [ "$fp" = "$(cat "$last" 2>/dev/null)" ] && exit 0
-
 mode=full; [ -f .claude/red-step ] && mode=fast
+# A full green covers both modes; a fast green (red step) never stands in for a full run.
+prev=$(cat "$last" 2>/dev/null)
+[ -n "$fp" ] && { [ "$prev" = "full $fp" ] || [ "$prev" = "$mode $fp" ]; } && exit 0
+
 if out=$(scripts/check.sh "$mode" 2>&1); then
-  echo "$fp" >"$last"; rm -f "$attempts"
+  echo "$mode $fp" >"$last"; rm -f "$attempts"
   [ "$mode" = fast ] && say "TDD red step active (.claude/red-step): tests are not gated until it's removed."
   exit 0
 fi
