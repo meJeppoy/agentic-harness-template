@@ -27,7 +27,7 @@ json_ok() { python3 -m json.tool "$1" >/dev/null; }
 
 # Copy the template (tracked + untracked, minus .git) into a fresh git repo; prints its path.
 fresh_copy() {
-  local dir; dir=$(mktemp -d)
+  local dir; dir=$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX") && [ -d "$dir" ] || { echo "fresh_copy: cannot create a temp dir" >&2; exit 1; }
   (cd "$ROOT" && git ls-files -co --exclude-standard | tar -cf - -T - | tar -xf - -C "$dir")
   (cd "$dir" && git init -q && git add -A && git -c user.name=t -c user.email=t@t commit -qm init)
   echo "$dir"
@@ -45,10 +45,10 @@ while IFS= read -r f; do
 done < <(cd "$ROOT" && find scripts .claude/hooks tests/harness -type f \( -name '*.sh' -o -path '*/git-hooks/*' \) 2>/dev/null | sed "s|^|$ROOT/|")
 
 echo "== check.sh"
-check "no toolchain → exits 0" bash -c "cd '$(mktemp -d)' && '$ROOT/scripts/check.sh' full"
+check "no toolchain → exits 0" bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && '$ROOT/scripts/check.sh' full"
 
 echo "== stop hook"
-d=$(fresh_copy); fake=$(mktemp -d)
+d=$(fresh_copy) && fake=$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX") || exit 1
 printf '#!/usr/bin/env bash\necho "$1" >>"%s/calls"; [ "$(cat "%s/result")" = pass ] || { echo "1 test failed in app.py"; exit 1; }\n' "$fake" "$fake" >"$d/scripts/check.sh"
 stop() { # stop <stop_hook_active> — runs the hook like Claude Code does
   printf '{"hook_event_name":"Stop","stop_hook_active":%s}' "$1" | CLAUDE_PROJECT_DIR="$d" bash "$d/.claude/hooks/stop-check.sh"
@@ -64,12 +64,30 @@ touch "$d/.claude/red-step"; echo change2 >>"$d/app.py"
 check "red step → only fast checks run" bash -c "$(declare -f stop); d='$d' stop false >/dev/null 2>&1; [ \"\$(tail -n1 '$fake/calls')\" = fast ]"
 rm "$d/.claude/red-step"; echo change3 >>"$d/app.py"
 check "HARNESS_SKIP_STOP_CHECK=1 → skipped" bash -c "n=\$(wc -l <'$fake/calls'); $(declare -f stop); d='$d' HARNESS_SKIP_STOP_CHECK=1 stop false >/dev/null; [ \$(wc -l <'$fake/calls') -eq \$n ]"
-check "outside a git repo → allowed" exits 0 bash -c "cd '$(mktemp -d)' && echo '{}' | CLAUDE_PROJECT_DIR=\$PWD bash '$d/.claude/hooks/stop-check.sh'"
+check "outside a git repo → allowed" exits 0 bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && echo '{}' | CLAUDE_PROJECT_DIR=\$PWD bash '$d/.claude/hooks/stop-check.sh'"
 rm -rf "$d" "$fake"
+
+echo "== guard hook"
+guard() { # guard <bash command> — runs the PreToolUse hook on a Bash call
+  python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1],"description":sys.argv[2]}}))' "$1" "${2:-run it}" |
+    HARNESS_GUARD=always bash "$ROOT/.claude/hooks/guard.sh" 2>/dev/null
+}
+for c in 'cat .env' 'echo $(< .env)' 'head -5 config/.env.local' "python -c \"print(open('.env').read())\"" 'source .env && npm start'; do
+  check "guard blocks: $c" exits 2 guard "$c"
+done
+for c in 'cat README.md' 'grep -r process.env src' 'source .venv/bin/activate' 'cat .env.example' 'ls -la'; do
+  check "guard allows: $c" exits 0 guard "$c"
+done
+check "guard ignores .env mentioned only in the description" exits 0 guard 'ls' 'check the .env file exists'
+
+echo "== settings"
+check "sandbox enabled" python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert s["sandbox"]["enabled"] is True' "$ROOT/.claude/settings.json"
+check "sandbox denies .env reads" python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert "./.env" in s["sandbox"]["filesystem"]["denyRead"]' "$ROOT/.claude/settings.json"
+check "guard hook registered" grep -q 'guard.sh' "$ROOT/.claude/settings.json"
 
 echo "== init + presets"
 for p in python typescript none; do
-  d=$(fresh_copy)
+  d=$(fresh_copy) || exit 1
   check "init ($p) runs non-interactively" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
   check "init ($p) removes template-only files" test ! -e "$d/tests/harness" -a ! -e "$d/.github/workflows/harness-ci.yml"
   check "init ($p) is safe to re-run" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"

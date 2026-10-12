@@ -1,22 +1,83 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(scripts/check.sh *)",
+      "Bash(./scripts/check.sh *)",
+      "Bash(scripts/doctor.sh*)",
+      "Bash(./scripts/doctor.sh*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr checks*)"
+    ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./**/credentials*)",
-      "Read(./**/*.pem)",
-      "Read(./**/*.key)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
-      "Bash(rm -rf /:*)",
-      "Bash(curl * | sh:*)",
-      "Bash(curl * | bash:*)"
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(**/credentials*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Edit(/.github/rulesets/**)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(rm -rf /*)",
+      "Bash(curl * | sh*)",
+      "Bash(curl * | bash*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "excludedCommands": ["pnpm install*", "pnpm add *", "pnpm remove *", "pnpm i *", "pnpm i"],
+    "filesystem": {
+      "denyRead": ["./.env", "./.env.*", "./**/.env", "./**/.env.*"],
+      "allowRead": ["./.env.example", "./**/.env.example"],
+      "allowWrite": [
+        "~/.cache/uv",
+        "~/.local/share/uv",
+        "~/.cache/pnpm",
+        "~/.local/share/pnpm",
+        "~/Library/Caches/pnpm",
+        "~/Library/pnpm",
+        "~/.npm"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "*.githubusercontent.com",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "registry.npmjs.org"
+      ]
+    }
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": { "source": "github", "repo": "DietrichGebert/ponytail" }
+    }
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "ponytail@ponytail": true
   },
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "120000"
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

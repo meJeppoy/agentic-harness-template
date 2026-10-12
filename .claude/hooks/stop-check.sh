@@ -16,7 +16,7 @@ last=.claude/.last-green attempts=.claude/.stop-attempts
 grep -q '"stop_hook_active"[[:space:]]*:[[:space:]]*true' <<<"$input" || rm -f "$attempts"
 
 # Fingerprint of the working tree (tracked + untracked, respecting .gitignore), via a throwaway index.
-idx=$(mktemp); cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null
+idx=$(mktemp "${TMPDIR:-/tmp}/harness-index.XXXXXX"); cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null
 fp=$(GIT_INDEX_FILE=$idx git add -A 2>/dev/null && GIT_INDEX_FILE=$idx git write-tree); rm -f "$idx"
 [ -n "$fp" ] && [ "$fp" = "$(cat "$last" 2>/dev/null)" ] && exit 0
 
