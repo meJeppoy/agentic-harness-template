@@ -15,5 +15,18 @@
   },
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "120000"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-check.sh\"",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
   }
 }

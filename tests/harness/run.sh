@@ -47,6 +47,26 @@ done < <(cd "$ROOT" && find scripts .claude/hooks tests/harness -type f \( -name
 echo "== check.sh"
 check "no toolchain → exits 0" bash -c "cd '$(mktemp -d)' && '$ROOT/scripts/check.sh' full"
 
+echo "== stop hook"
+d=$(fresh_copy); fake=$(mktemp -d)
+printf '#!/usr/bin/env bash\necho "$1" >>"%s/calls"; [ "$(cat "%s/result")" = pass ] || { echo "1 test failed in app.py"; exit 1; }\n' "$fake" "$fake" >"$d/scripts/check.sh"
+stop() { # stop <stop_hook_active> — runs the hook like Claude Code does
+  printf '{"hook_event_name":"Stop","stop_hook_active":%s}' "$1" | CLAUDE_PROJECT_DIR="$d" bash "$d/.claude/hooks/stop-check.sh"
+}
+echo pass >"$fake/result"
+check "green checks → allowed to stop" exits 0 stop false
+check "no changes since green → checks not re-run" bash -c "n=\$(wc -l <'$fake/calls'); $(declare -f stop); d='$d' stop false; [ \$(wc -l <'$fake/calls') -eq \$n ]"
+echo fail >"$fake/result"; echo change >"$d/app.py"
+check "failing checks → blocked (exit 2)" exits 2 stop false
+check "block message names the failure" bash -c "$(declare -f stop); d='$d' stop false 2>&1 | grep -q 'test failed in app.py'"
+check "gives up after 3 automatic retries" bash -c "$(declare -f stop); d='$d'; stop true 2>/dev/null; stop true 2>/dev/null; stop true >/dev/null 2>&1; [ \$? -eq 0 ]"
+touch "$d/.claude/red-step"; echo change2 >>"$d/app.py"
+check "red step → only fast checks run" bash -c "$(declare -f stop); d='$d' stop false >/dev/null 2>&1; [ \"\$(tail -n1 '$fake/calls')\" = fast ]"
+rm "$d/.claude/red-step"; echo change3 >>"$d/app.py"
+check "HARNESS_SKIP_STOP_CHECK=1 → skipped" bash -c "n=\$(wc -l <'$fake/calls'); $(declare -f stop); d='$d' HARNESS_SKIP_STOP_CHECK=1 stop false >/dev/null; [ \$(wc -l <'$fake/calls') -eq \$n ]"
+check "outside a git repo → allowed" exits 0 bash -c "cd '$(mktemp -d)' && echo '{}' | CLAUDE_PROJECT_DIR=\$PWD bash '$d/.claude/hooks/stop-check.sh'"
+rm -rf "$d" "$fake"
+
 echo "== init + presets"
 for p in python typescript none; do
   d=$(fresh_copy)
