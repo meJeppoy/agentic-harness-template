@@ -44,6 +44,31 @@ while IFS= read -r f; do
   check "executable: ${f#"$ROOT"/}" test -x "$f"
 done < <(cd "$ROOT" && find scripts .claude/hooks tests/harness -type f \( -name '*.sh' -o -path '*/git-hooks/*' \) 2>/dev/null | sed "s|^|$ROOT/|")
 
+echo "== check.sh"
+check "no toolchain → exits 0" bash -c "cd '$(mktemp -d)' && '$ROOT/scripts/check.sh' full"
+
+echo "== init + presets"
+for p in python typescript none; do
+  d=$(fresh_copy)
+  check "init ($p) runs non-interactively" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
+  check "init ($p) removes template-only files" test ! -e "$d/tests/harness" -a ! -e "$d/.github/workflows/harness-ci.yml"
+  check "init ($p) is safe to re-run" env HARNESS_PRESET=$p HARNESS_SKIP_INSTALL=1 HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
+  case $p in
+    python) check "init (python) copies preset" test -f "$d/pyproject.toml" -a -f "$d/.github/workflows/ci.yml" -a -f "$d/tests/test_smoke.py" ;;
+    typescript) check "init (typescript) copies preset" test -f "$d/package.json" -a -f "$d/tsconfig.json" -a -f "$d/biome.json" -a -f "$d/src/smoke.test.ts" -a -f "$d/.github/workflows/ci.yml" ;;
+    none) check "init (none) copies no preset" test ! -e "$d/pyproject.toml" -a ! -e "$d/package.json" ;;
+  esac
+  if [ "${1:-}" = --presets ] && [ $p != none ]; then
+    check "preset ($p) installs" env HARNESS_PRESET=$p HARNESS_AI_REVIEW=n "$d/scripts/init.sh"
+    check "preset ($p) is green out of the box" bash -c "cd '$d' && scripts/check.sh full"
+    if [ $p = python ]; then broken="$d/tests/test_broken.py"; printf 'def test_broken():\n    assert 1 == 2\n' >"$broken"
+    else broken="$d/src/broken.test.ts"; printf 'import { expect, test } from "vitest";\n\ntest("broken", () => {\n\texpect(1).toBe(2);\n});\n' >"$broken"; fi
+    check "preset ($p) fast skips tests" bash -c "cd '$d' && scripts/check.sh fast"
+    check "preset ($p) full catches a failing test" exits 1 bash -c "cd '$d' && scripts/check.sh full >/dev/null 2>&1"
+  fi
+  rm -rf "$d"
+done
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

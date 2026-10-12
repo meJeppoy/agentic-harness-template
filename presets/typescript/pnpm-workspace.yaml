@@ -1,0 +1,5 @@
+# Let esbuild (used by vitest) run its install script. Both keys: pnpm 10 reads the first, pnpm 11+ the second.
+onlyBuiltDependencies:
+  - esbuild
+allowBuilds:
+  esbuild: true
