@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Local merge floor — works on every GitHub plan (rulesets need a public repo or a paid plan).
+# Enable once per clone: git config core.hooksPath scripts/git-hooks   (/doctor tells you if it's off)
+# Emergency bypass: git push --no-verify — and say why in docs/DECISIONS.md.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+while read -r _ _ remote_ref _; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/master)
+      echo "✗ Direct push to ${remote_ref#refs/heads/} blocked. Push a branch and open a pull request instead." >&2
+      exit 1 ;;
+  esac
+done
+
+if [ -f .claude/red-step ]; then
+  echo "✗ A TDD red step is still open (.claude/red-step). Make the tests pass, then remove the marker, before pushing." >&2
+  exit 1
+fi
+
+scripts/check.sh full || { echo "✗ Checks failed — not pushing. Fix them first (scripts/check.sh full shows why)." >&2; exit 1; }

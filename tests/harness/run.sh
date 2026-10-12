@@ -67,6 +67,22 @@ check "HARNESS_SKIP_STOP_CHECK=1 → skipped" bash -c "n=\$(wc -l <'$fake/calls'
 check "outside a git repo → allowed" exits 0 bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && echo '{}' | CLAUDE_PROJECT_DIR=\$PWD bash '$d/.claude/hooks/stop-check.sh'"
 rm -rf "$d" "$fake"
 
+echo "== pre-push"
+d=$(fresh_copy) && fake=$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX") || exit 1
+printf '#!/usr/bin/env bash\n[ "$(cat "%s/result")" = pass ]\n' "$fake" >"$d/scripts/check.sh"
+push() { # push <remote branch> — feeds git's pre-push stdin format
+  echo "refs/heads/x abc123 refs/heads/$1 def456" | (cd "$d" && bash scripts/git-hooks/pre-push origin git@example.com:o/r.git) >/dev/null 2>&1
+}
+echo pass >"$fake/result"
+check "push to a feature branch with green checks → allowed" exits 0 push feat/x
+check "push to main → blocked" exits 1 push main
+check "push to master → blocked" exits 1 push master
+echo fail >"$fake/result"
+check "push with failing checks → blocked" exits 1 push feat/x
+echo pass >"$fake/result"; touch "$d/.claude/red-step"
+check "push during a TDD red step → blocked" exits 1 push feat/x
+rm -rf "$d" "$fake"
+
 echo "== guard hook"
 guard() { # guard <bash command> — runs the PreToolUse hook on a Bash call
   python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1],"description":sys.argv[2]}}))' "$1" "${2:-run it}" |
