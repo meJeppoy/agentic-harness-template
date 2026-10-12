@@ -93,6 +93,22 @@ echo pass >"$fake/result"; touch "$d/.claude/red-step"
 check "push during a TDD red step → blocked" exits 1 push feat/x
 rm -rf "$d" "$fake"
 
+echo "== doctor"
+d=$(fresh_copy) || exit 1
+doc() { (cd "$d" && HARNESS_DOCTOR_OFFLINE=1 bash scripts/doctor.sh 2>&1); }
+check "fresh copy has no FAILs" bash -c "$(declare -f doc); d='$d' doc >/dev/null"
+check "warns when pre-push floor is off" bash -c "$(declare -f doc); d='$d' doc | grep -q '^WARN.*pre-push'"
+git -C "$d" config core.hooksPath scripts/git-hooks
+check "passes when pre-push floor is on" bash -c "$(declare -f doc); d='$d' doc | grep -q '^PASS.*pre-push'"
+check "warns about unfilled CLAUDE.md placeholders" bash -c "$(declare -f doc); d='$d' doc | grep -q '^WARN.*placeholder'"
+touch "$d/.claude/red-step"
+check "warns about an open TDD red step" bash -c "$(declare -f doc); d='$d' doc | grep -q '^WARN.*red step'"
+mv "$d/.claude/skills/tdd" "$d/tdd.bak"
+check "fails when an owned skill is missing" exits 1 bash -c "$(declare -f doc); d='$d' doc >/dev/null"
+check "explains the fix for a missing skill" bash -c "$(declare -f doc); d='$d' doc | grep -A1 '^FAIL.*tdd' | grep -q '→'"
+rm -rf "$d"
+check "fails outside a git repo" exits 1 bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && HARNESS_DOCTOR_OFFLINE=1 bash '$ROOT/scripts/doctor.sh' >/dev/null 2>&1"
+
 echo "== guard hook"
 guard() { # guard <bash command> — runs the PreToolUse hook on a Bash call
   python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1],"description":sys.argv[2]}}))' "$1" "${2:-run it}" |
