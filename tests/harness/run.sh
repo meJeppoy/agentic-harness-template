@@ -54,6 +54,14 @@ done
 dead='grill-with-docs|domain-modeling|to-spec|to-tickets|to-prd|to-issues|codebase-design|setup-matt-pocock-skills|GLOSSARY\.md'
 check "skills reference no un-vendored skills or files" bash -c "! grep -rnE '/($dead)|\"($dead)\"|\`($dead)\`|$dead' '$ROOT/.claude/skills' | grep -v 'mattpocock/skills@'"
 
+echo "== docs"
+# Docs must only point at skills/commands that exist. History files (decisions, the v2 design/plan) are exempt.
+gone='to-prd|to-issues|to-spec|to-tickets|grill-with-docs|setup-matt-pocock-skills|/handoff|/triage|/ask-matt|/prototype|/research|/diagnosing-bugs|/improve-codebase-architecture|npx skills'
+check "docs reference no removed skills or commands" bash -c "cd '$ROOT' && ! git ls-files -co --exclude-standard -- '*.md' '*.sh' '*.yml' | grep -vE '^(tests/harness/run.sh|docs/DECISIONS.md|docs/designs/harness-v2.md|docs/plans/harness-v2.md|THIRD_PARTY.md|\.claude/skills/)' | xargs grep -nE '$gone'"
+for c in session-start session-end doctor run-checks sync-tracker; do
+  check "command /$c exists" test -f "$ROOT/.claude/commands/$c.md"
+done
+
 echo "== check.sh"
 check "no toolchain → exits 0" bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && '$ROOT/scripts/check.sh' full"
 

@@ -85,3 +85,14 @@ Design: `docs/designs/harness-v2.md` · Branch per slice, PR each · Decisions D
 ## Done for the whole plan
 
 All slices merged · `tests/harness/run.sh` green in CI · a fresh "Use this template" copy passes `/doctor` and goes green per preset · GUIDE.md walked end-to-end once on a clean machine (or clean user account) · plan moved to `docs/plans/done/`.
+
+## Implementation notes (2026-10-11)
+
+Built on `feat/harness-v2`, one commit per slice, one PR (instead of a branch per slice) because every slice touches `tests/harness/run.sh`. Deviations from the design, found while verifying live:
+
+- **Plugins can't be pinned by a consumer.** Claude Code has no user-side version pin. Instead: plugins are declared in project settings (`enabledPlugins`, `extraKnownMarketplaces`) and `/doctor` warns when an installed major differs from the tested one (Superpowers 6.x, Ponytail 4.x).
+- **Guard hook is platform-gated.** On macOS/Linux/WSL2 with the sandbox available it exits immediately: its pattern match false-positived on commit messages and grep patterns mentioning `.env`, and the sandbox already enforces the read deny at the OS level (verified: EPERM).
+- **Sandbox needs toolchain allowances.** uv and pnpm caches added to `filesystem.allowWrite`; `pnpm install`/`add`/`remove` and `gh` added to `excludedCommands` (pnpm's store lock and Go TLS verification both fail under macOS Seatbelt). In the Claude desktop app session used to build this, `excludedCommands` did not take effect for `gh` — verify in a plain CLI session (open question).
+- **No `features.json`, no `/handoff`.** Session-end writes a handoff doc instead (humanlayer pattern).
+- **Secret scanning** is unavailable on personal private repos even on Pro (GitHub docs source) — REPO-SECURITY §0 states it.
+- **T-12** (rulesets + security settings on the template repo) waits for explicit owner approval.

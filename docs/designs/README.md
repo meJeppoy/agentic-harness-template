@@ -1,1 +1,1 @@
-Design docs (from grilling or Superpowers brainstorming on large features). One per feature.
+Specs from `/write-spec`: one file per feature, `<feature-slug>.md`, with an Intent section and numbered acceptance criteria (AC1, AC2, ...). Each AC gets a named test; the verifier checks the mapping. Status line goes from draft to approved before any code is written.

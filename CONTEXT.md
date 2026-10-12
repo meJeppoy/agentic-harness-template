@@ -1,6 +1,6 @@
 # CONTEXT — domain language
 
-The shared language between you and the agent. Built and maintained by `/grill-with-docs` and the domain-modeling skill — expect it to grow; prune terms that die. One term, one meaning; if two names exist for one thing, kill one.
+The shared language between you and the agent. Built and maintained by `/grill` — expect it to grow; prune terms that die. One term, one meaning; if two names exist for one thing, kill one.
 
 Format:
 
