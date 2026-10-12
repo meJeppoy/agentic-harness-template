@@ -102,4 +102,4 @@ Built on `feat/harness-v2`, one commit per slice, one PR (instead of a branch pe
 - **AI review trigger** uses `author_association` in OWNER/MEMBER/COLLABORATOR (works for org repos) with `pull-requests: read` + `id-token: write` (the action posts through its GitHub App), per the action's own examples.
 - **Pre-push checks the working tree**, not the pushed commits — documented in the hook; CI checks the real commits.
 - **Doctor's protection check** reads the rules GitHub actually enforces on the default branch (`/rules/branches/<branch>`) and requires a `pull_request` rule, so disabled or unrelated rulesets don't count.
-- **T-12** (rulesets + security settings on the template repo) waits for explicit owner approval.
+- **T-12** done 2026-10-12 for rulesets: `protect-main` and `protect-release-tags` active on `meJeppoy/agentic-harness-template`; doctor's protection check verified PASS against them. Secret scanning + push protection not yet enabled (separate owner approval).
