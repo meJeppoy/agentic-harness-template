@@ -122,6 +122,15 @@ check "explains the fix for a missing skill" bash -c "$(declare -f doc); d='$d' 
 rm -rf "$d"
 check "fails outside a git repo" exits 1 bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && HARNESS_DOCTOR_OFFLINE=1 bash '$ROOT/scripts/doctor.sh' >/dev/null 2>&1"
 
+# Online GitHub check with a stub gh: a sandbox TLS failure must not be reported as "not signed in".
+d=$(fresh_copy) && bin=$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX") || exit 1
+printf '#!/usr/bin/env bash\necho "$GH_STUB_ERR" >&2; exit 1\n' >"$bin/gh"; chmod +x "$bin/gh"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/claude"; chmod +x "$bin/claude"
+gh_doc() { (cd "$d" && PATH="$bin:$PATH" GH_STUB_ERR="$1" bash scripts/doctor.sh 2>&1); }
+check "gh TLS error in the sandbox → says sandbox, not 'not signed in'" bash -c "$(declare -f gh_doc); d='$d' bin='$bin'; out=\$(gh_doc 'tls: failed to verify certificate: x509: OSStatus -26276'); grep -q '^WARN.*sandbox' <<<\"\$out\" && ! grep -q 'signed in' <<<\"\$out\""
+check "gh genuinely signed out → says sign in" bash -c "$(declare -f gh_doc); d='$d' bin='$bin'; gh_doc 'HTTP 401: Bad credentials' | grep -A1 '^WARN.*signed in' | grep -q 'gh auth login'"
+rm -rf "$d" "$bin"
+
 echo "== guard hook"
 guard() { # guard <bash command> — runs the PreToolUse hook on a Bash call
   python3 -c 'import json,sys; print(json.dumps({"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":sys.argv[1],"description":sys.argv[2]}}))' "$1" "${2:-run it}" |
