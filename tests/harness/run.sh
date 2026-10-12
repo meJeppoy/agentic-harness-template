@@ -44,6 +44,16 @@ while IFS= read -r f; do
   check "executable: ${f#"$ROOT"/}" test -x "$f"
 done < <(cd "$ROOT" && find scripts .claude/hooks tests/harness -type f \( -name '*.sh' -o -path '*/git-hooks/*' \) 2>/dev/null | sed "s|^|$ROOT/|")
 
+echo "== owned skills"
+for s in grill write-spec slice-tickets tdd diagnose; do
+  f="$ROOT/.claude/skills/$s/SKILL.md"
+  check "skill $s: frontmatter name matches folder" grep -qx "name: $s" "$f"
+  check "skill $s: has a description" grep -q '^description: ..' "$f"
+  check "skill $s: credits its upstream source" grep -q 'mattpocock/skills@49dd158' "$f"
+done
+dead='grill-with-docs|domain-modeling|to-spec|to-tickets|to-prd|to-issues|codebase-design|setup-matt-pocock-skills|GLOSSARY\.md'
+check "skills reference no un-vendored skills or files" bash -c "! grep -rnE '/($dead)|\"($dead)\"|\`($dead)\`|$dead' '$ROOT/.claude/skills' | grep -v 'mattpocock/skills@'"
+
 echo "== check.sh"
 check "no toolchain → exits 0" bash -c "cd '$(mktemp -d "${TMPDIR:-/tmp}/harness.XXXXXX")' && '$ROOT/scripts/check.sh' full"
 

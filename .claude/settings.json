@@ -28,7 +28,7 @@
   },
   "sandbox": {
     "enabled": true,
-    "excludedCommands": ["pnpm install*", "pnpm add *", "pnpm remove *", "pnpm i *", "pnpm i"],
+    "excludedCommands": ["pnpm install*", "pnpm add *", "pnpm remove *", "pnpm i *", "pnpm i", "gh *"],
     "filesystem": {
       "denyRead": ["./.env", "./.env.*", "./**/.env", "./**/.env.*"],
       "allowRead": ["./.env.example", "./**/.env.example"],
